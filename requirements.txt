@@ -1,0 +1,7 @@
+# requirements.txt
+crewai
+streamlit
+langchain
+chromadb
+langchain-ollama>=0.1.0  # Ensure you have the correct version
+pypdf
