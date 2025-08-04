@@ -143,13 +143,80 @@ class RAGCrew:
             return len(self.vector_store.get()['documents'])
         return 0
 
+    def check_relevance(self, query, relevant_docs, threshold=0.3):
+        """Check if the retrieved documents are relevant to the query"""
+        if not relevant_docs:
+            return False, "No documents found"
+        
+        # Check if any document contains the key terms from the query
+        query_terms = query.lower().split()
+        key_terms = [term for term in query_terms if len(term) > 3]  # Focus on meaningful terms
+        
+        # Check for exact matches of key terms in documents
+        relevant_content = " ".join([doc.page_content.lower() for doc in relevant_docs])
+        
+        # Count how many key terms are found in the documents
+        found_terms = sum(1 for term in key_terms if term in relevant_content)
+        relevance_score = found_terms / len(key_terms) if key_terms else 0
+        
+        # Additional check for named entities (people, companies, etc.)
+        named_entities = []
+        for term in query_terms:
+            if term[0].isupper() and len(term) > 2:  # Potential named entity
+                named_entities.append(term)
+        
+        # Check if any named entities are found in documents
+        entity_found = any(entity.lower() in relevant_content for entity in named_entities)
+        
+        is_relevant = relevance_score >= threshold or entity_found
+        
+        if not is_relevant:
+            missing_info = f"Query terms not found in documents: {', '.join(key_terms)}"
+            if named_entities:
+                missing_info += f"\nNamed entities not found: {', '.join(named_entities)}"
+            return False, missing_info
+        
+        return True, f"Relevance score: {relevance_score:.2f}"
+
+    def generate_out_of_context_response(self, query, missing_info):
+        """Generate a response for out-of-context questions"""
+        out_of_context_prompt = f"""
+        The user asked: "{query}"
+        
+        However, this information is not available in the uploaded documents. 
+        Missing information: {missing_info}
+        
+        Please provide a helpful response that:
+        1. Acknowledges that the requested information is not in the uploaded documents
+        2. Explains what information is available in the documents
+        3. Suggests what the user could do to get the information they need
+        4. Offers to help with other questions about the available documents
+        
+        Be polite, helpful, and professional in your response.
+        """
+        
+        try:
+            # Use the writer agent to generate a helpful response
+            response = self.llm.predict(out_of_context_prompt)
+            return response
+        except Exception as e:
+            return f"I apologize, but I cannot find information about '{query}' in the uploaded documents. The documents I have access to don't contain this information. Please check if you have uploaded the correct documents or try asking about information that might be available in the current documents."
+
     def generate_response(self, query):
-        """Generate response using CrewAI agents with enhanced analytical capabilities"""
+        """Generate response using CrewAI agents with enhanced analytical capabilities and out-of-context handling"""
         if not self.retriever:
             raise ValueError("Documents not loaded. Call load_and_process_documents first.")
         
         # Retrieve relevant documents for the query
         relevant_docs = self.query_documents(query)
+        
+        # Check if the retrieved documents are relevant to the query
+        is_relevant, relevance_info = self.check_relevance(query, relevant_docs)
+        
+        if not is_relevant:
+            print(f"⚠️ Out-of-context query detected: {query}")
+            print(f"📊 Relevance info: {relevance_info}")
+            return self.generate_out_of_context_response(query, relevance_info)
         
         # Format the retrieved documents for context
         document_context = "\n\n".join([f"Document {i+1}:\n{doc.page_content}" for i, doc in enumerate(relevant_docs)])

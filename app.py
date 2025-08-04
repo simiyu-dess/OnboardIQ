@@ -14,12 +14,20 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 if 'document_count' not in st.session_state:
     st.session_state.document_count = 0
+if 'out_of_context_count' not in st.session_state:
+    st.session_state.out_of_context_count = 0
 
 # App title and description
 st.title("🧠 Local RAG System with CrewAI and Ollama")
 st.markdown("""
     Ask questions about your uploaded documents using local AI models.
     All processing happens on your Mac - no data leaves your machine.
+    
+    **Features:**
+    - 🔒 100% Local Processing
+    - 🤖 Multi-Agent Workflow
+    - 📄 Document Intelligence
+    - ⚠️ Out-of-Context Detection
 """)
 
 # Sidebar for configuration
@@ -76,6 +84,7 @@ with st.sidebar:
                         st.session_state.documents_loaded = True
                         st.session_state.messages = []  # Clear previous messages
                         st.session_state.document_count = st.session_state.rag_crew.get_document_count()
+                        st.session_state.out_of_context_count = 0  # Reset counter
                         st.success("✅ Documents processed successfully!")
                         
                         # Show document processing info
@@ -104,6 +113,7 @@ with st.sidebar:
                 st.session_state.documents_loaded = False
                 st.session_state.messages = []
                 st.session_state.document_count = 0
+                st.session_state.out_of_context_count = 0
                 st.success("✅ All documents cleared!")
             else:
                 st.error("❌ Failed to clear documents")
@@ -113,6 +123,8 @@ with st.sidebar:
     # Document status
     if st.session_state.documents_loaded:
         st.success(f"📄 {st.session_state.document_count} document chunks loaded")
+        if st.session_state.out_of_context_count > 0:
+            st.warning(f"⚠️ {st.session_state.out_of_context_count} out-of-context questions detected")
     else:
         st.info("📄 No documents loaded")
 
@@ -128,6 +140,11 @@ with response_container:
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            
+            # Show out-of-context indicator
+            if message.get("out_of_context", False):
+                st.warning("⚠️ This information was not found in the uploaded documents")
+            
             if "metadata" in message:
                 with st.expander("📄 Document References"):
                     for doc in message["metadata"]:
@@ -158,6 +175,13 @@ with query_container:
                         # Get relevant documents first
                         relevant_docs = st.session_state.rag_crew.query_documents(prompt)
                         
+                        # Check if this is an out-of-context question
+                        is_relevant, relevance_info = st.session_state.rag_crew.check_relevance(prompt, relevant_docs)
+                        
+                        if not is_relevant:
+                            st.warning("⚠️ Out-of-context question detected")
+                            st.session_state.out_of_context_count += 1
+                        
                         # Generate response
                         response = st.session_state.rag_crew.generate_response(prompt)
                         
@@ -168,6 +192,7 @@ with query_container:
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": response,
+                            "out_of_context": not is_relevant,
                             "metadata": [
                                 {
                                     "source": doc.metadata.get("source", "Unknown"),
