@@ -44,5 +44,5 @@ A **Retrieval-Augmented Generation (RAG)** system designed to accelerate and sim
 2. **Installation**:  
    ```bash  
    git clone [your-repo-url]  
-   cd onboard-ai  
+   cd onboardIQ
    pip install -r requirements.txt  

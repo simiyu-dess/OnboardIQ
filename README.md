@@ -25,7 +25,7 @@ A powerful local Retrieval Augmented Generation (RAG) system that uses CrewAI fo
 1. **Clone the repository**:
    ```bash
    git clone <your-repo-url>
-   cd Ai-baby
+   cd OnboardIQ
    ```
 
 2. **Create and activate virtual environment**:
@@ -111,7 +111,7 @@ The system automatically detects query types:
 ## 📁 Project Structure
 
 ```
-Ai-baby/
+OnboardIQ/
 ├── rag_crew.py              # Main RAG system
 ├── app.py                   # Streamlit web interface
 ├── app_enhanced.py          # Enhanced web interface
